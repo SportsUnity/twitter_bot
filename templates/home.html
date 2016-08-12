@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row">
+	<div class="col-sm-2">
+		<label class="control-label" for="dates">Dates :</label>
+		<select class="form-control" name="dates" id="dates">	
+			{% for date in dates %}
+				<option>{{ date }}</option>
+			{% endfor %}
+		</select>
+	</div>
+	<div class="col-sm-2">
+		<label class="control-label" for="sport">Sport :</label>
+		<select class="form-control" name="sportType" id="sportType">	
+			<option>cricket</option>
+			<option>football</option>
+		</select>
+	</div>
+</div>
+<hr/>
+
+<div>
+	<table class="table">
+		<thead>
+			<tr>
+				<th>Series</th><th>Home VS Away</th>
+				<th>Time</th><th>Status<em> (click to change)</em></th>
+			</tr>
+		</thead>
+		<tbody id="gamesList"></tbody>
+	</table>
+</div>
+
+
+<div class="modal fade bd-example-modal-lg" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+    	<div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+          <div class="modal-title text-center" id="matchTeams"></div><div class='text-center' id="matchDateTime"></div>
+        </div>
+        <div class="modal-body" id="matchInputForm"></div>
+        <div class="modal-footer" style="text-align:center;">
+          <!-- <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button> -->
+          <button type="button" class="btn" id="changeStatus" style="padding:10px 120px;"></button>
+          <button type="button" class="btn btn-primary" id="changeHashtags" style="padding:10px 120px;">SAVE HASHTAGS</button>
+        </div>
+    </div>
+  </div>
+</div>
+
+
+<script src="/static/js/jquery.blockUI.js"></script>
+
+<script type="text/javascript">
+
+	// loading the matches schedule on loading of document,
+	// on change in dates, and on change of sport
+	$(document).ready(function(){
+		getSchedule($('#dates').val(), $('#sportType').val());
+	})
+	
+	$('#dates').on('change', function(){
+		getSchedule($('#dates').val(), $('#sportType').val());
+	});
+
+	$('#sportType').on('change', function(){
+		getSchedule($('#dates').val(), $('#sportType').val());
+	});
+
+
+	function createGamesListHtml(game, num){
+
+		var html_content = '<tr>';
+		html_content += '<td>'+game.series_name+'</td>';
+		html_content += '<td id="teams_'+num+'">'+game.home_team+' <strong>VS</strong> '+game.away_team+'</td>';
+		html_content += '<td id="gameTime_'+num+'">'+game.time+'</td>';
+		html_content += '<td><button id="status_'+num+'" type="button" '; 
+
+ 		if (game.status == "UNSCHEDULED")
+			html_content += 'class="btn btn-primary statusButton" ';
+
+		if (game.status == "RUNNING")
+			html_content += 'class="btn btn-warning disabled" ';
+
+		if (game.status == "DECLINED")
+			html_content += 'class="btn btn-danger disabled" ';
+
+		if (game.status == "FINISHED")
+			html_content += 'class="btn disabled" ';
+
+		if (game.status == "SCHEDULED")
+			html_content += 'class="btn btn-success statusButton" ';
+
+		// adding custom attributes having data of matches like match_id, series id and hashtags
+		html_content += 'series_id="'+game.series_id+'" match_id="'+game.match_id+'" game_hashtags="'+game.hashtags+'">';
+		html_content +=  game.status+'</button></td>';
+		html_content += '</tr>'
+		return html_content;
+	}
+
+
+	function setGamesList(gamesData){
+
+		var game_list_html = '';
+		
+		for (x in gamesData)
+				game_list_html += createGamesListHtml(gamesData[x], x);
+
+		if (game_list_html)
+			$('#gamesList').html(game_list_html);
+		else
+			$('#gamesList').html('<tr><td><strong><em>NO MATCHES FOUND</em></strong></td></tr>');
+	}
+
+
+	function getSchedule(theDate, sportType){
+
+		$.blockUI();
+
+		$.ajax({
+			type:'post',
+			url:'/get-schedule',
+			data: {date:theDate, sport:sportType},
+		})
+		.done(function(data) {
+			setGamesList(data.data)
+		})
+		.fail(function() {
+			console.log('Unexpected Failure..!');
+		})
+		.always(function() {
+			$.unblockUI();
+		});
+	}
+
+
+	$(document).on('click', 'button.statusButton', function(){
+
+		sport_type = $('#sportType').val();
+
+		var item = (this).id;
+
+		button_id = '#'+item;
+
+		item = item.replace('status_', '');
+
+		// getting the series id and match id 
+		// epoch from the custom attribute
+		series_id = $(this).attr("series_id");
+		match_id =  $(this).attr("match_id");
+		match_epoch = $(this).attr("match_epoch");
+
+		var match_teams = $('#teams_'+item).text();
+		$('#matchTeams').html('<h2>'+match_teams+'</h2>');
+
+		var match_date_time = 'Date: '+$('#dates').val()+',  Time: '+$('#gameTime_'+item).text()
+		$('#matchDateTime').html('<h4><strong><em>'+match_date_time+'</em></strong></h4>');
+		$('#matchInputForm').html(createMatchInputForm($(this).attr("game_hashtags")))
+
+		var match_status = $(this).text();
+		$('#matchInputForm').html(createMatchInputForm($(this).attr("game_hashtags")))
+
+		if (match_status == 'UNSCHEDULED'){	
+			$('#changeStatus').text('SCHEDULE').addClass('btn-success').removeClass('btn-danger');
+			$('#changeHashtags').hide();
+		}
+		
+		if (match_status == 'SCHEDULED'){
+			$('#changeStatus').text('UNSCHEDULE').addClass('btn-danger').removeClass('btn-success');
+			$('#changeHashtags').show();
+		}
+
+		$('#myModal').modal();
+	});
+
+
+	function createMatchInputForm(hashtag_string){
+
+		if (hashtag_string == 'undefined'){hashtag_string = "";}
+
+		var raw_html = '<h4 class="text-center"><em>(Enter the Hashtags to used for this match)</em></h4>'
+		raw_html += '<br><form>'
+		raw_html += '<input class="form-control" id="matchHashtags"'
+		raw_html +=  'placeholder="#example #of #a #hashtag #string" value="'+hashtag_string+'">'
+		raw_html += '</form>'
+		return raw_html
+	}
+
+	$(document).on('click', 'button#changeStatus', function(){
+		$.blockUI();
+
+		$.ajax({
+			url: '/scheduler-handler',
+			data: {'sport':sport_type, 'series_id': series_id, 'match_id':match_id, 'hashtags': $('#matchHashtags').val()},
+		})
+		.done(function(data) {
+			var status = $(button_id).text();
+
+			if (status == "UNSCHEDULED"){
+				$(button_id).removeClass('btn-primary').addClass('btn-success');
+				$(button_id).text('SCHEDULED');
+			}
+
+			if (status == "SCHEDULED"){
+				$(button_id).removeClass('btn-success').addClass('btn-primary');
+				$(button_id).text('UNSCHEDULED');
+			}
+		})
+		.fail(function(data) {
+			console.log(data)
+		})
+		.always(function() {
+			$.unblockUI();
+			$('#myModal').modal('hide');
+		});
+	});
+
+
+	$(document).on('click', 'button#changeHashtags', function(){
+		$.blockUI();
+
+		$.ajax({
+			url: '/change-game-hashtags',
+			data: {'sport':sport_type, 'series_id': series_id, 'match_id':match_id, 'hashtags': $('#matchHashtags').val()},
+		})
+		.done(function(data) {
+		})
+		.fail(function(data) {
+			console.log(data)
+		})
+		.always(function() {
+			$.unblockUI();
+			$('#myModal').modal('hide');
+		});
+	});
+
+	</script>
+{% endblock %}

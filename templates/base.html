@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Twitter Flash</title>
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <script src="/static/js/jquery-1.12.4.min.js"></script>
+    <script src="/static/js/bootstrap.min.js"></script>
+</head>
+<body>
+	<nav class="navbar navbar-inverse">
+      <div class="container-fluid">
+        <div class="navbar-header">
+            <a class="navbar-brand" href="/">SportsUnity</a>
+        </div>
+        <ul class="nav navbar-nav navbar-right">
+            <li><a href="#"><span class="glyphicon glyphicon-log-out"></span> Logout </a></li>
+        </ul>
+      </div>
+    </nav>
+	<div class="container-fluid">
+		{% block content %}
+		{% endblock %}
+	</div> 
+</body>
+</html>
